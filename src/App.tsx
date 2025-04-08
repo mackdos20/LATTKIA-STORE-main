@@ -1,3 +1,5 @@
-import OrderPage from "@/pages/order";
-
-<Route path="/order/:orderId" element={<OrderPage />} /> 
+// App.tsx
+export default function App() {
+    return null;
+  }
+  
