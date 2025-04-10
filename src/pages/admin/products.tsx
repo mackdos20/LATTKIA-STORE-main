@@ -129,13 +129,36 @@ const AdminProducts = () => {
     setDiscounts(prev => prev.filter((_, i) => i !== index));
   };
   
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+  
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "latakia_uploads"); // تأكد من أنك أنشأت upload preset بهذا الاسم
+  
+    try {
+      const res = await fetch("https://api.cloudinary.com/v1_1/dtdzwsvjc/image/upload", {
+        method: "POST",
+        body: formData,
+      });
+  
+      const data = await res.json();
+      setImagePreview(data.secure_url); // هذا هو رابط الصورة النهائي
+      toast({
+        title: "تم رفع الصورة",
+        description: "تم رفع الصورة بنجاح إلى Cloudinary",
+      });
+    } catch (error) {
+      console.error("Cloudinary Upload Error:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل رفع الصورة إلى Cloudinary",
+        variant: "destructive",
+      });
+    }
   };
+  
   
   const clearImageSelection = () => {
     setImageFile(null);
@@ -231,7 +254,7 @@ const AdminProducts = () => {
       
       if (selectedProduct) {
         // Update existing product
-        const updatedProduct = await api.updateProduct(selectedProduct.id, productData, imageFile || undefined);
+        const updatedProduct = await api.updateProduct(selectedProduct.id, productData);
         
         setProducts(prev => 
           prev.map(p => p.id === updatedProduct.id ? updatedProduct : p)
@@ -243,7 +266,7 @@ const AdminProducts = () => {
         });
       } else {
         // Create new product
-        const newProduct = await api.createProduct(productData as any, imageFile || undefined);
+        const newProduct = await api.createProduct(productData as any);
         
         setProducts(prev => [...prev, newProduct]);
         

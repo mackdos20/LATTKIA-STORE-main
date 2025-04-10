@@ -17,6 +17,7 @@ import SubcategoryPage from "./pages/subcategory";
 import ProductPage from "./pages/product";
 import CartPage from "./pages/cart";
 import OrdersPage from "./pages/orders";
+import OrderPage from "./pages/order"; // ✅ تمت الإضافة هنا
 
 // Admin Pages
 import AdminDashboard from "./pages/admin";
@@ -44,6 +45,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/products/:productId" element={<ProductPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/order/:orderId" element={<OrderPage />} /> {/* ✅ المسار الجديد */}
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminDashboard />} />
