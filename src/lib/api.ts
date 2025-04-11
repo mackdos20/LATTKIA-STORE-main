@@ -18,6 +18,19 @@ export type DbUser = {
   telegramId?: string;
 };
 
+// Export functions directly
+export const getUserByEmail = async (email: string) => {
+  return prisma.user.findUnique({
+    where: { email }
+  });
+};
+
+export const createUser = async (user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => {
+  return prisma.user.create({
+    data: user
+  });
+};
+
 export const api = {
   // Auth
   login: async (email: string, password: string): Promise<{ user: User; token: string } | null> => {
@@ -34,18 +47,6 @@ export const api = {
   },
   
   // User functions
-  createUser: async (user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => {
-    return prisma.user.create({
-      data: user
-    });
-  },
-  
-  getUserByEmail: async (email: string) => {
-    return prisma.user.findUnique({
-      where: { email }
-    });
-  },
-  
   updateUser: async (id: string, data: Partial<User>) => {
     return prisma.user.update({
       where: { id },
