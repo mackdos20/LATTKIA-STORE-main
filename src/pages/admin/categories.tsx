@@ -14,6 +14,7 @@ import { Category, Subcategory } from "@/lib/db/models";
 import { Loader2, Plus, Pencil, Trash2, Upload, X, Tag, Package } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ImageUpload } from '@/components/ImageUpload';
 
 const AdminCategories = () => {
   const { theme } = useThemeStore();
@@ -70,20 +71,14 @@ const AdminCategories = () => {
   }, [toast]);
   
   // Category handlers
-  const handleCategoryImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setCategoryImageFile(file);
-    setCategoryImagePreview(URL.createObjectURL(file));
-  };
-  
-  const clearCategoryImageSelection = () => {
+  const handleCategoryImageUpload = async (imageUrl: string) => {
+    setCategoryImagePreview(imageUrl);
     setCategoryImageFile(null);
+  };
+
+  const handleCategoryImageDelete = () => {
     setCategoryImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setCategoryImageFile(null);
   };
   
   const openNewCategoryDialog = () => {
@@ -189,20 +184,14 @@ const AdminCategories = () => {
   };
   
   // Subcategory handlers
-  const handleSubcategoryImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setSubcategoryImageFile(file);
-    setSubcategoryImagePreview(URL.createObjectURL(file));
-  };
-  
-  const clearSubcategoryImageSelection = () => {
+  const handleSubcategoryImageUpload = async (imageUrl: string) => {
+    setSubcategoryImagePreview(imageUrl);
     setSubcategoryImageFile(null);
+  };
+
+  const handleSubcategoryImageDelete = () => {
     setSubcategoryImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setSubcategoryImageFile(null);
   };
   
   const openNewSubcategoryDialog = () => {
@@ -567,49 +556,26 @@ const AdminCategories = () => {
               
               <div className="space-y-2">
                 <Label className="text-right block">صورة الفئة</Label>
-                <div className={`border-2 border-dashed rounded-lg p-4 text-center ${
-                  theme === 'dark' 
-                    ? 'border-blue-700 bg-blue-900/20 hover:bg-blue-900/30' 
-                    : 'border-blue-200 bg-blue-50/50 hover:bg-blue-50'
-                } transition-all duration-300 cursor-pointer`}
-                onClick={() => fileInputRef.current?.click()}>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleCategoryImageChange}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                  
-                  {categoryImagePreview ? (
-                    <div className="relative">
-                      <img
-                        src={categoryImagePreview}
-                        alt="Category preview"
-                        className="mx-auto max-h-48 rounded-lg"
-                      />
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="destructive"
-                        className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearCategoryImageSelection();
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="py-4">
-                      <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        اضغط لاختيار صورة أو اسحب وأفلت
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <ImageUpload
+                  onUploadSuccess={handleCategoryImageUpload}
+                  onUploadError={(error) => {
+                    toast({
+                      title: "خطأ",
+                      description: error.message || "حدث خطأ أثناء رفع الصورة",
+                      variant: "destructive",
+                    });
+                  }}
+                  onDeleteSuccess={handleCategoryImageDelete}
+                  onDeleteError={(error) => {
+                    toast({
+                      title: "خطأ",
+                      description: error.message || "حدث خطأ أثناء حذف الصورة",
+                      variant: "destructive",
+                    });
+                  }}
+                  initialImage={categoryImagePreview}
+                  folder="categories"
+                />
               </div>
             </div>
             
@@ -747,49 +713,26 @@ const AdminCategories = () => {
               
               <div className="space-y-2">
                 <Label className="text-right block">صورة القسم</Label>
-                <div className={`border-2 border-dashed rounded-lg p-4 text-center ${
-                  theme === 'dark' 
-                    ? 'border-blue-700 bg-blue-900/20 hover:bg-blue-900/30' 
-                    : 'border-blue-200 bg-blue-50/50 hover:bg-blue-50'
-                } transition-all duration-300 cursor-pointer`}
-                onClick={() => fileInputRef.current?.click()}>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleSubcategoryImageChange}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                  
-                  {subcategoryImagePreview ? (
-                    <div className="relative">
-                      <img
-                        src={subcategoryImagePreview}
-                        alt="Subcategory preview"
-                        className="mx-auto max-h-48 rounded-lg"
-                      />
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="destructive"
-                        className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearSubcategoryImageSelection();
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="py-4">
-                      <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        اضغط لاختيار صورة أو اسحب وأفلت
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <ImageUpload
+                  onUploadSuccess={handleSubcategoryImageUpload}
+                  onUploadError={(error) => {
+                    toast({
+                      title: "خطأ",
+                      description: error.message || "حدث خطأ أثناء رفع الصورة",
+                      variant: "destructive",
+                    });
+                  }}
+                  onDeleteSuccess={handleSubcategoryImageDelete}
+                  onDeleteError={(error) => {
+                    toast({
+                      title: "خطأ",
+                      description: error.message || "حدث خطأ أثناء حذف الصورة",
+                      variant: "destructive",
+                    });
+                  }}
+                  initialImage={subcategoryImagePreview}
+                  folder="subcategories"
+                />
               </div>
             </div>
             

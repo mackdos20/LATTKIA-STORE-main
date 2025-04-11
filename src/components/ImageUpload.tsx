@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { uploadCompressedImage } from '../utils/cloudinaryUtils';
+import { uploadImage } from '../utils/uploadImage';
 import { deleteImage } from '../utils/cloudinaryUtils';
 
 interface ImageUploadProps {
@@ -7,9 +7,8 @@ interface ImageUploadProps {
   onUploadError?: (error: Error) => void;
   onDeleteSuccess?: () => void;
   onDeleteError?: (error: Error) => void;
-  compressionQuality?: number;
-  maxWidth?: number;
-  maxHeight?: number;
+  initialImage?: string;
+  folder?: string;
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -17,14 +16,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   onUploadError,
   onDeleteSuccess,
   onDeleteError,
-  compressionQuality = 80,
-  maxWidth = 1920,
-  maxHeight = 1080,
+  initialImage,
+  folder,
 }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialImage || null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(initialImage || null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -38,18 +36,16 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       setIsUploading(true);
       setUploadProgress(0);
 
-      const imageUrl = await uploadCompressedImage(
-        file,
-        compressionQuality,
-        maxWidth,
-        maxHeight
-      );
+      const imageUrl = await uploadImage(file, (progress) => {
+        setUploadProgress(progress);
+      });
       
       setCurrentImageUrl(imageUrl);
       onUploadSuccess(imageUrl);
     } catch (error) {
       console.error('Upload error:', error);
       onUploadError?.(error as Error);
+      setPreviewUrl(null);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -85,7 +81,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       />
       <label
         htmlFor="image-upload"
-        className="cursor-pointer bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+        className={`cursor-pointer px-4 py-2 rounded transition-colors ${
+          isUploading
+            ? 'bg-gray-500 text-white cursor-not-allowed'
+            : 'bg-blue-500 text-white hover:bg-blue-600'
+        }`}
       >
         {isUploading ? 'Uploading...' : 'Upload Image'}
       </label>

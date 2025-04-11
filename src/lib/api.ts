@@ -1,7 +1,8 @@
-import { categories, subcategories, products, orders, users, 
-  saveCategories, saveSubcategories, saveProducts, saveOrders, saveUsers } from './db/mock-data';
-import { Category, Subcategory, Product, Order, Discount } from './db/models';
-import { User } from './stores/auth-store';
+import { PrismaClient } from '@prisma/client';
+import { User, Product, Category, Subcategory, Order, OrderItem } from '@/lib/db/models';
+import { uploadImage } from '../utils/uploadImage';
+
+const prisma = new PrismaClient();
 
 // Simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -21,8 +22,8 @@ export const api = {
   // Auth
   login: async (email: string, password: string): Promise<{ user: User; token: string } | null> => {
     await delay(500);
-    const user = users.find(u => u.email === email && u.password === password);
-    if (!user) return null;
+    const user = await getUserByEmail(email);
+    if (!user || user.password !== password) return null;
     
     // Remove password from user object
     const { password: _, ...userWithoutPassword } = user;
@@ -32,383 +33,213 @@ export const api = {
     };
   },
   
-  // Categories
-  getCategories: async (): Promise<Category[]> => {
-    await delay(300);
-    return categories;
+  // User functions
+  createUser: async (user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => {
+    return prisma.user.create({
+      data: user
+    });
+  },
+  
+  getUserByEmail: async (email: string) => {
+    return prisma.user.findUnique({
+      where: { email }
+    });
+  },
+  
+  updateUser: async (id: string, data: Partial<User>) => {
+    return prisma.user.update({
+      where: { id },
+      data
+    });
+  },
+  
+  // Product functions
+  createProduct: async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
+    return prisma.product.create({
+      data: product
+    });
+  },
+  
+  getProducts: async () => {
+    return prisma.product.findMany({
+      include: {
+        category: true,
+        subcategory: true
+      }
+    });
+  },
+  
+  getProductById: async (id: string) => {
+    return prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        subcategory: true
+      }
+    });
+  },
+  
+  updateProduct: async (id: string, data: Partial<Product>) => {
+    return prisma.product.update({
+      where: { id },
+      data
+    });
+  },
+  
+  deleteProduct: async (id: string) => {
+    return prisma.product.delete({
+      where: { id }
+    });
+  },
+  
+  // Category functions
+  createCategory: async (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+    return prisma.category.create({
+      data: category
+    });
+  },
+  
+  getCategories: async () => {
+    return prisma.category.findMany({
+      include: {
+        subcategories: true
+      }
+    });
   },
   
   getCategoryById: async (id: string): Promise<Category | undefined> => {
     await delay(200);
-    return categories.find(category => category.id === id);
+    return prisma.category.findUnique({
+      where: { id },
+      include: {
+        subcategories: true
+      }
+    });
   },
   
-  // Subcategories
-  getSubcategories: async (): Promise<Subcategory[]> => {
-    await delay(300);
-    return subcategories;
+  updateCategory: async (id: string, data: Partial<Category>) => {
+    return prisma.category.update({
+      where: { id },
+      data
+    });
+  },
+  
+  deleteCategory: async (id: string) => {
+    return prisma.category.delete({
+      where: { id }
+    });
+  },
+  
+  // Subcategory functions
+  createSubcategory: async (subcategory: Omit<Subcategory, 'id' | 'createdAt' | 'updatedAt'>) => {
+    return prisma.subcategory.create({
+      data: subcategory
+    });
+  },
+  
+  getSubcategories: async () => {
+    return prisma.subcategory.findMany({
+      include: {
+        category: true
+      }
+    });
   },
   
   getSubcategoriesByCategoryId: async (categoryId: string): Promise<Subcategory[]> => {
     await delay(300);
-    return subcategories.filter(subcategory => subcategory.categoryId === categoryId);
+    return prisma.subcategory.findMany({
+      where: { categoryId },
+      include: {
+        category: true
+      }
+    });
   },
   
   getSubcategoryById: async (id: string): Promise<Subcategory | undefined> => {
     await delay(200);
-    return subcategories.find(subcategory => subcategory.id === id);
-  },
-  
-  // Products
-  getProducts: async (): Promise<Product[]> => {
-    await delay(500);
-    return products;
-  },
-  
-  getProductsBySubcategoryId: async (subcategoryId: string): Promise<Product[]> => {
-    await delay(500);
-    return products.filter(product => product.subcategoryId === subcategoryId);
-  },
-  
-  getProductById: async (id: string): Promise<Product | undefined> => {
-    await delay(300);
-    return products.find(product => product.id === id);
-  },
-  
-  getFeaturedProducts: async (): Promise<Product[]> => {
-    await delay(400);
-    // Return the newest products first
-    return [...products]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 4);
-  },
-  
-  // Orders
-  getOrders: async (userId?: string): Promise<Order[]> => {
-    await delay(600);
-    if (userId) {
-      return orders.filter(order => order.userId === userId);
-    }
-    return orders;
-  },
-  
-  getOrderById: async (id: string): Promise<Order | undefined> => {
-    await delay(400);
-    return orders.find(order => order.id === id);
-  },
-  
-  createOrder: async (userId: string, items: { productId: string; quantity: number }[]): Promise<Order> => {
-    await delay(800);
-    
-    const orderItems = items.map((item, index) => {
-      const product = products.find(p => p.id === item.productId)!;
-      
-      // Calculate discount
-      let price = product.price;
-      if (product.discounts && product.discounts.length > 0) {
-        const sortedDiscounts = [...product.discounts].sort(
-          (a, b) => b.minQuantity - a.minQuantity
-        );
-        
-        const applicableDiscount = sortedDiscounts.find(
-          discount => item.quantity >= discount.minQuantity
-        );
-        
-        if (applicableDiscount) {
-          price = price * (1 - applicableDiscount.discountPercentage / 100);
-        }
+    return prisma.subcategory.findUnique({
+      where: { id },
+      include: {
+        category: true
       }
-      
-      return {
-        id: `new-${index}`,
-        orderId: 'new-order',
-        productId: item.productId,
-        product,
-        quantity: item.quantity,
-        price,
-      };
     });
-    
-    const total = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    
-    const newOrder: Order = {
-      id: `order-${Date.now()}`,
-      userId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      items: orderItems,
-      total,
-    };
-    
-    // In a real app, we would save this to the database
-    orders.push(newOrder);
-    
-    return newOrder;
   },
   
-  updateOrderStatus: async (orderId: string, status: Order['status'], expectedDeliveryTime?: string): Promise<Order> => {
-    await delay(500);
-    
-    const orderIndex = orders.findIndex(order => order.id === orderId);
-    if (orderIndex === -1) {
-      throw new Error('Order not found');
-    }
-    
-    const updatedOrder = {
-      ...orders[orderIndex],
-      status,
-      ...(expectedDeliveryTime ? { expectedDeliveryTime } : {}),
-    };
-    
-    orders[orderIndex] = updatedOrder;
-    
-    return updatedOrder;
+  updateSubcategory: async (id: string, data: Partial<Subcategory>) => {
+    return prisma.subcategory.update({
+      where: { id },
+      data
+    });
   },
   
-  // Admin
-  createUser: async (userData: Omit<DbUser, 'id'>): Promise<User> => {
-    // In a real app, this would make an API call
-    // For now, we'll use mock data
-    const newUser: DbUser = {
-      id: `user${Date.now()}`,
-      ...userData,
-      role: userData.role || 'customer', // Ensure role is set
-    };
-    
-    // Add to mock data
-    users.push(newUser);
-    
-    // Return user without password
-    const { password, ...userWithoutPassword } = newUser;
-    return userWithoutPassword;
+  deleteSubcategory: async (id: string) => {
+    return prisma.subcategory.delete({
+      where: { id }
+    });
   },
   
-  updateUser: async (userId: string, userData: Partial<Omit<DbUser, 'id'>>): Promise<User> => {
-    await delay(500);
-    
-    const userIndex = users.findIndex(user => user.id === userId);
-    if (userIndex === -1) {
-      throw new Error('User not found');
-    }
-    
-    const updatedUser = {
-      ...users[userIndex],
-      ...userData,
-    };
-    
-    users[userIndex] = updatedUser;
-    
-    // Return user without password
-    const { password, ...userWithoutPassword } = updatedUser;
-    return userWithoutPassword;
+  // Order functions
+  createOrder: async (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>, items: Omit<OrderItem, 'id'>[]) => {
+    return prisma.order.create({
+      data: {
+        ...order,
+        items: {
+          create: items
+        }
+      },
+      include: {
+        items: {
+          include: {
+            product: true
+          }
+        },
+        user: true
+      }
+    });
   },
   
-  createProduct: async (productData: Omit<Product, 'id'>, imageFile?: File): Promise<Product> => {
-    await delay(700);
-    
-    let imageUrl = productData.image;
-    
-    if (imageFile) {
-      // Convert image to Base64
-      const reader = new FileReader();
-      imageUrl = await new Promise((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(imageFile);
-      });
-    }
-    
-    const newProduct = {
-      id: `product-${Date.now()}`,
-      ...productData,
-      image: imageUrl,
-    };
-    
-    products.push(newProduct);
-    saveProducts(products);
-    
-    return newProduct;
+  getOrders: async (userId?: string) => {
+    return prisma.order.findMany({
+      where: userId ? { userId } : undefined,
+      include: {
+        items: {
+          include: {
+            product: true
+          }
+        },
+        user: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
   },
   
-  updateProduct: async (id: string, productData: Partial<Product>, imageFile?: File): Promise<Product> => {
-    await delay(600);
-    
-    const productIndex = products.findIndex(product => product.id === id);
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-    
-    let imageUrl = productData.image || products[productIndex].image;
-    
-    if (imageFile) {
-      // Convert image to Base64
-      const reader = new FileReader();
-      imageUrl = await new Promise((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(imageFile);
-      });
-    }
-    
-    const updatedProduct = {
-      ...products[productIndex],
-      ...productData,
-      image: imageUrl,
-    };
-    
-    products[productIndex] = updatedProduct;
-    saveProducts(products);
-    
-    return updatedProduct;
+  getOrderById: async (id: string) => {
+    return prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: true
+          }
+        },
+        user: true
+      }
+    });
   },
   
-  deleteProduct: async (id: string): Promise<void> => {
-    await delay(500);
-    
-    const productIndex = products.findIndex(product => product.id === id);
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-    
-    products.splice(productIndex, 1);
-    saveProducts(products);
+  updateOrder: async (id: string, data: Partial<Order>) => {
+    return prisma.order.update({
+      where: { id },
+      data
+    });
   },
   
-  // Categories and Subcategories management
-  createCategory: async (categoryData: Omit<Category, 'id'>, imageFile?: File): Promise<Category> => {
-    await delay(500);
-    
-    let imageUrl = categoryData.image;
-    
-    if (imageFile) {
-      // Convert image to Base64
-      const reader = new FileReader();
-      imageUrl = await new Promise((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(imageFile);
-      });
-    }
-    
-    const newCategory = {
-      id: `category-${Date.now()}`,
-      ...categoryData,
-      image: imageUrl,
-    };
-    
-    categories.push(newCategory);
-    saveCategories(categories);
-    
-    return newCategory;
-  },
-  
-  updateCategory: async (id: string, categoryData: Partial<Category>, imageFile?: File): Promise<Category> => {
-    await delay(400);
-    
-    const categoryIndex = categories.findIndex(category => category.id === id);
-    if (categoryIndex === -1) {
-      throw new Error('Category not found');
-    }
-    
-    let imageUrl = categoryData.image || categories[categoryIndex].image;
-    
-    if (imageFile) {
-      // Convert image to Base64
-      const reader = new FileReader();
-      imageUrl = await new Promise((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(imageFile);
-      });
-    }
-    
-    const updatedCategory = {
-      ...categories[categoryIndex],
-      ...categoryData,
-      image: imageUrl,
-    };
-    
-    categories[categoryIndex] = updatedCategory;
-    saveCategories(categories);
-    
-    return updatedCategory;
-  },
-  
-  deleteCategory: async (id: string): Promise<void> => {
-    await delay(400);
-    
-    const categoryIndex = categories.findIndex(category => category.id === id);
-    if (categoryIndex === -1) {
-      throw new Error('Category not found');
-    }
-    
-    categories.splice(categoryIndex, 1);
-    saveCategories(categories);
-  },
-  
-  createSubcategory: async (subcategoryData: Omit<Subcategory, 'id'>, imageFile?: File): Promise<Subcategory> => {
-    await delay(500);
-    
-    let imageUrl = subcategoryData.image;
-    
-    if (imageFile) {
-      // Convert image to Base64
-      const reader = new FileReader();
-      imageUrl = await new Promise((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(imageFile);
-      });
-    }
-    
-    const newSubcategory = {
-      id: `subcategory-${Date.now()}`,
-      ...subcategoryData,
-      image: imageUrl,
-    };
-    
-    subcategories.push(newSubcategory);
-    saveSubcategories(subcategories);
-    
-    return newSubcategory;
-  },
-  
-  updateSubcategory: async (id: string, subcategoryData: Partial<Subcategory>, imageFile?: File): Promise<Subcategory> => {
-    await delay(400);
-    
-    const subcategoryIndex = subcategories.findIndex(subcategory => subcategory.id === id);
-    if (subcategoryIndex === -1) {
-      throw new Error('Subcategory not found');
-    }
-    
-    let imageUrl = subcategoryData.image || subcategories[subcategoryIndex].image;
-    
-    if (imageFile) {
-      // Convert image to Base64
-      const reader = new FileReader();
-      imageUrl = await new Promise((resolve) => {
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(imageFile);
-      });
-    }
-    
-    const updatedSubcategory = {
-      ...subcategories[subcategoryIndex],
-      ...subcategoryData,
-      image: imageUrl,
-    };
-    
-    subcategories[subcategoryIndex] = updatedSubcategory;
-    saveSubcategories(subcategories);
-    
-    return updatedSubcategory;
-  },
-  
-  deleteSubcategory: async (id: string): Promise<void> => {
-    await delay(400);
-    
-    const subcategoryIndex = subcategories.findIndex(subcategory => subcategory.id === id);
-    if (subcategoryIndex === -1) {
-      throw new Error('Subcategory not found');
-    }
-    
-    subcategories.splice(subcategoryIndex, 1);
-    saveSubcategories(subcategories);
+  deleteOrder: async (id: string) => {
+    return prisma.order.delete({
+      where: { id }
+    });
   },
   
   // Discounts
@@ -464,7 +295,7 @@ export const api = {
   sendTelegramNotification: async (userId: string, message: string): Promise<boolean> => {
     await delay(300);
     
-    const user = users.find(u => u.id === userId);
+    const user = await getUserByEmail(userId);
     if (!user || !user.telegramId) {
       return false;
     }

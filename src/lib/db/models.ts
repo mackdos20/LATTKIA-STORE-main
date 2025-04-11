@@ -1,54 +1,69 @@
-export type Category = {
+export interface User {
   id: string;
   name: string;
-  image: string;
-};
+  email: string;
+  password: string;
+  phone?: string;
+  role: 'USER' | 'ADMIN';
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export type Subcategory = {
-  id: string;
-  name: string;
-  categoryId: string;
-  image: string;
-};
-
-export type Product = {
+export interface Product {
   id: string;
   name: string;
   description: string;
   price: number;
-  cost: number;
-  stock: number;
-  subcategoryId: string;
-  image: string;
+  image?: string;
   categoryId: string;
-  isFeatured?: boolean;
-  createdAt: string;
-  updatedAt: string;
-  discounts?: Discount[];
-};
+  category: Category;
+  subcategoryId?: string;
+  subcategory?: Subcategory;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export type Discount = {
+export interface Category {
   id: string;
-  productId: string;
-  minQuantity: number;
-  discountPercentage: number;
-};
+  name: string;
+  description?: string;
+  image?: string;
+  products: Product[];
+  subcategories: Subcategory[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export type Order = {
+export interface Subcategory {
+  id: string;
+  name: string;
+  description?: string;
+  image?: string;
+  categoryId: string;
+  category: Category;
+  products: Product[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Order {
   id: string;
   userId: string;
-  status: 'pending' | 'approved' | 'shipping' | 'delivered' | 'cancelled';
-  createdAt: string;
-  expectedDeliveryTime?: string;
-  items: OrderItem[];
+  user: User;
+  status: 'PENDING' | 'APPROVED' | 'SHIPPING' | 'DELIVERED' | 'CANCELLED';
   total: number;
-};
+  items: OrderItem[];
+  expectedDeliveryTime?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export type OrderItem = {
+export interface OrderItem {
   id: string;
   orderId: string;
+  order: Order;
   productId: string;
   product: Product;
   quantity: number;
   price: number;
-};
+}

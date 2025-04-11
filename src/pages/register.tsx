@@ -9,29 +9,55 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-const LoginPage = () => {
+const RegisterPage = () => {
   const { theme } = useThemeStore();
-  const { login, isLoading, error } = useAuthStore();
+  const { register, isLoading, error } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phone: ""
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    try {
-      await login(email, password);
+    if (formData.password !== formData.confirmPassword) {
       toast({
-        title: "تم تسجيل الدخول بنجاح",
+        title: "خطأ",
+        description: "كلمات المرور غير متطابقة",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      await register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone || undefined
+      });
+      
+      toast({
+        title: "تم إنشاء الحساب بنجاح",
         description: "مرحباً بك في متجر لاتيكيا",
       });
+      
       navigate("/");
     } catch (error) {
       toast({
         title: "خطأ",
-        description: error instanceof Error ? error.message : "حدث خطأ أثناء تسجيل الدخول",
+        description: error instanceof Error ? error.message : "حدث خطأ أثناء إنشاء الحساب",
         variant: "destructive",
       });
     }
@@ -42,18 +68,52 @@ const LoginPage = () => {
       <div className="container mx-auto py-16">
         <div className="max-w-md mx-auto">
           <h1 className={`text-3xl font-bold mb-8 text-center ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
-            تسجيل الدخول
+            إنشاء حساب جديد
           </h1>
           
           <form onSubmit={handleSubmit} className="space-y-6" dir="rtl">
             <div className="space-y-2">
+              <Label htmlFor="name" className="text-right block">الاسم</Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                className={`${
+                  theme === 'dark' 
+                    ? 'bg-blue-900/30 border-blue-700 focus:border-blue-500 focus:ring-blue-500/50' 
+                    : 'bg-white border-blue-200 focus:border-blue-400'
+                } text-right`}
+              />
+            </div>
+            
+            <div className="space-y-2">
               <Label htmlFor="email" className="text-right block">البريد الإلكتروني</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
                 required
+                className={`${
+                  theme === 'dark' 
+                    ? 'bg-blue-900/30 border-blue-700 focus:border-blue-500 focus:ring-blue-500/50' 
+                    : 'bg-white border-blue-200 focus:border-blue-400'
+                } text-right`}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-right block">رقم الهاتف (اختياري)</Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleChange}
                 className={`${
                   theme === 'dark' 
                     ? 'bg-blue-900/30 border-blue-700 focus:border-blue-500 focus:ring-blue-500/50' 
@@ -66,9 +126,27 @@ const LoginPage = () => {
               <Label htmlFor="password" className="text-right block">كلمة المرور</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={handleChange}
+                required
+                className={`${
+                  theme === 'dark' 
+                    ? 'bg-blue-900/30 border-blue-700 focus:border-blue-500 focus:ring-blue-500/50' 
+                    : 'bg-white border-blue-200 focus:border-blue-400'
+                } text-right`}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-right block">تأكيد كلمة المرور</Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
                 required
                 className={`${
                   theme === 'dark' 
@@ -96,24 +174,24 @@ const LoginPage = () => {
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                  جاري تسجيل الدخول...
+                  جاري إنشاء الحساب...
                 </>
               ) : (
-                'تسجيل الدخول'
+                'إنشاء حساب'
               )}
             </Button>
           </form>
           
           <div className="mt-6 text-center">
             <p className="text-muted-foreground">
-              ليس لديك حساب؟{" "}
+              لديك حساب بالفعل؟{" "}
               <button
-                onClick={() => navigate("/register")}
+                onClick={() => navigate("/login")}
                 className={`${
                   theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
                 } font-medium`}
               >
-                إنشاء حساب جديد
+                تسجيل الدخول
               </button>
             </p>
           </div>
@@ -123,4 +201,4 @@ const LoginPage = () => {
   );
 };
 
-export default LoginPage;
+export default RegisterPage; 

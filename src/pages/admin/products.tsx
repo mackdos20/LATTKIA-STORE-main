@@ -15,6 +15,7 @@ import { Product, Category, Subcategory, Discount } from "@/lib/db/models";
 import { Loader2, Plus, Pencil, Trash2, Upload, X, Tag, Package, DollarSign, BarChart } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ImageUpload } from '@/components/ImageUpload';
 
 const AdminProducts = () => {
   const { theme } = useThemeStore();
@@ -129,43 +130,14 @@ const AdminProducts = () => {
     setDiscounts(prev => prev.filter((_, i) => i !== index));
   };
   
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-  
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "latakia_uploads"); // تأكد من أنك أنشأت upload preset بهذا الاسم
-  
-    try {
-      const res = await fetch("https://api.cloudinary.com/v1_1/dtdzwsvjc/image/upload", {
-        method: "POST",
-        body: formData,
-      });
-  
-      const data = await res.json();
-      setImagePreview(data.secure_url); // هذا هو رابط الصورة النهائي
-      toast({
-        title: "تم رفع الصورة",
-        description: "تم رفع الصورة بنجاح إلى Cloudinary",
-      });
-    } catch (error) {
-      console.error("Cloudinary Upload Error:", error);
-      toast({
-        title: "خطأ",
-        description: "فشل رفع الصورة إلى Cloudinary",
-        variant: "destructive",
-      });
-    }
+  const handleImageUpload = async (imageUrl: string) => {
+    setImagePreview(imageUrl);
+    setImageFile(null); // We don't need the file anymore as it's uploaded to Cloudinary
   };
   
-  
-  const clearImageSelection = () => {
-    setImageFile(null);
+  const handleImageDelete = () => {
     setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setImageFile(null);
   };
   
   const openNewProductDialog = () => {
@@ -254,7 +226,7 @@ const AdminProducts = () => {
       
       if (selectedProduct) {
         // Update existing product
-        const updatedProduct = await api.updateProduct(selectedProduct.id, productData);
+        const updatedProduct = await api.updateProduct(selectedProduct.id, productData, imageFile || undefined);
         
         setProducts(prev => 
           prev.map(p => p.id === updatedProduct.id ? updatedProduct : p)
@@ -266,7 +238,7 @@ const AdminProducts = () => {
         });
       } else {
         // Create new product
-        const newProduct = await api.createProduct(productData as any);
+        const newProduct = await api.createProduct(productData as any, imageFile || undefined);
         
         setProducts(prev => [...prev, newProduct]);
         
@@ -656,49 +628,26 @@ const AdminProducts = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-right block">صورة المنتج</Label>
-                  <div className={`border-2 border-dashed rounded-lg p-4 text-center ${
-                    theme === 'dark' 
-                      ? 'border-blue-700 bg-blue-900/20 hover:bg-blue-900/30' 
-                      : 'border-blue-200 bg-blue-50/50 hover:bg-blue-50'
-                  } transition-all duration-300 cursor-pointer`}
-                  onClick={() => fileInputRef.current?.click()}>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageChange}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    
-                    {imagePreview ? (
-                      <div className="relative">
-                        <img
-                          src={imagePreview}
-                          alt="Product preview"
-                          className="mx-auto max-h-48 rounded-lg"
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="destructive"
-                          className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearImageSelection();
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="py-4">
-                        <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          اضغط لاختيار صورة أو اسحب وأفلت
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  <ImageUpload
+                    onUploadSuccess={handleImageUpload}
+                    onUploadError={(error) => {
+                      toast({
+                        title: "خطأ",
+                        description: error.message || "حدث خطأ أثناء رفع الصورة",
+                        variant: "destructive",
+                      });
+                    }}
+                    onDeleteSuccess={handleImageDelete}
+                    onDeleteError={(error) => {
+                      toast({
+                        title: "خطأ",
+                        description: error.message || "حدث خطأ أثناء حذف الصورة",
+                        variant: "destructive",
+                      });
+                    }}
+                    initialImage={imagePreview}
+                    folder="products"
+                  />
                 </div>
                 
                 <div className="space-y-2">
