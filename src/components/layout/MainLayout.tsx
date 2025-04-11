@@ -67,12 +67,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             
             {user ? (
               <div className="flex items-center gap-2">
-                <Link to={user.role === 'admin' ? '/admin' : '/orders'}>
+                <Link to={user.role === 'ADMIN' ? '/admin' : '/orders'}>
                   <Button 
                     variant="outline" 
                     className={`${theme === 'dark' ? 'border-blue-500 text-blue-400 hover:bg-blue-950' : 'border-blue-600 text-blue-600 hover:bg-blue-50'} transition-all duration-300`}
                   >
-                    {user.role === 'admin' ? 'لوحة التحكم' : 'طلباتي'}
+                    {user.role === 'ADMIN' ? 'لوحة التحكم' : 'طلباتي'}
                   </Button>
                 </Link>
                 <Link to="/logout">

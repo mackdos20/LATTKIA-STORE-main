@@ -77,6 +77,10 @@ const AdminOrders = () => {
     
     if (!selectedOrder) return;
     
+    if (!window.confirm(`هل أنت متأكد من تغيير حالة الطلب إلى ${getStatusText(orderStatus)}؟`)) {
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
@@ -90,24 +94,36 @@ const AdminOrders = () => {
         prev.map(o => o.id === updatedOrder.id ? updatedOrder : o)
       );
       
+      // إعداد رسالة الإشعار
+      let notificationMessage = `تم تحديث حالة طلبك #${selectedOrder.id.substring(selectedOrder.id.length - 6)} إلى ${getStatusText(orderStatus)}`;
+      
+      if (expectedDeliveryTime) {
+        const formattedDate = format(new Date(expectedDeliveryTime), 'dd/MM/yyyy');
+        notificationMessage += `\nموعد التسليم المتوقع: ${formattedDate}`;
+      }
+      
+      if (orderStatus === 'shipping') {
+        notificationMessage += `\nرقم التتبع: ${selectedOrder.trackingNumber || 'سيتم إرساله قريباً'}`;
+      }
+      
       toast({
         title: "تم التحديث",
         description: `تم تحديث حالة الطلب #${updatedOrder.id.substring(updatedOrder.id.length - 6)} بنجاح`,
       });
       
-      // Send notification to customer about order status update
+      // إرسال إشعار للعميل
       if (selectedOrder.userId) {
         await api.sendTelegramNotification(
           selectedOrder.userId,
-          `تم تحديث حالة طلبك #${selectedOrder.id.substring(selectedOrder.id.length - 6)} إلى ${getStatusText(orderStatus)}`
+          notificationMessage
         );
       }
       
       setIsUpdateDialogOpen(false);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "خطأ",
-        description: error.message || "حدث خطأ أثناء تحديث الطلب",
+        description: error instanceof Error ? error.message : "حدث خطأ أثناء تحديث الطلب",
         variant: "destructive",
       });
     } finally {
@@ -214,17 +230,60 @@ const AdminOrders = () => {
     return true;
   });
   
-  const exportOrderToPDF = (order: Order) => {
-    // In a real app, this would generate a PDF
-    // For now, we'll just show a toast
-    toast({
-      title: "تصدير PDF",
-      description: `تم تصدير الطلب #${order.id.substring(order.id.length - 6)} كملف PDF`,
-    });
+  const exportOrderToPDF = async (order: Order) => {
+    try {
+      // تجميع بيانات الطلب
+      const orderData = {
+        orderId: order.id,
+        orderDate: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm'),
+        status: getStatusText(order.status),
+        customer: {
+          name: order.user.name,
+          phone: order.user.phone,
+          email: order.user.email,
+        },
+        items: order.items.map(item => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.quantity * item.price,
+        })),
+        subtotal: order.total,
+        shipping: order.shippingCost || 0,
+        total: order.total + (order.shippingCost || 0),
+        shippingAddress: order.shippingAddress,
+        trackingNumber: order.trackingNumber,
+        expectedDeliveryTime: order.expectedDeliveryTime 
+          ? format(new Date(order.expectedDeliveryTime), 'dd/MM/yyyy')
+          : 'غير محدد',
+      };
+
+      // إنشاء وتنزيل ملف PDF
+      const pdfBlob = await api.generateOrderPDF(orderData);
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `order-${order.id.substring(order.id.length - 6)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "تم التصدير",
+        description: `تم تصدير الطلب #${order.id.substring(order.id.length - 6)} كملف PDF`,
+      });
+    } catch (error) {
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تصدير الطلب",
+        variant: "destructive",
+      });
+    }
   };
   
   // Redirect if not admin
-  if (user?.role !== 'admin') {
+  if (user?.role !== 'ADMIN') {
     return <Navigate to="/" />;
   }
 

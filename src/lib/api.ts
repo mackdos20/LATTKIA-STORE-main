@@ -1,309 +1,269 @@
-import { PrismaClient } from '@prisma/client';
 import { User, Product, Category, Subcategory, Order, OrderItem } from '@/lib/db/models';
-import { uploadImage } from '../utils/uploadImage';
-
-const prisma = new PrismaClient();
+import { getToken } from './auth';
 
 // Simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Define a type for the database user that includes password
-export type DbUser = {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  phone: string;
-  role: 'admin' | 'customer';
-  telegramId?: string;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+
+const handleResponse = async (response: Response) => {
+  if (!response.ok) {
+    let errorMessage = 'حدث خطأ أثناء معالجة الطلب';
+    try {
+      const error = await response.json();
+      errorMessage = error.message || errorMessage;
+    } catch (e) {
+      // إذا فشل تحويل JSON، نستخدم رسالة الخطأ الافتراضية
+    }
+    throw new Error(errorMessage);
+  }
+  return response.json();
 };
 
-// Export functions directly
-export const getUserByEmail = async (email: string) => {
-  return prisma.user.findUnique({
-    where: { email }
-  });
-};
-
-export const createUser = async (user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => {
-  return prisma.user.create({
-    data: user
-  });
+const getHeaders = () => {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 };
 
 export const api = {
   // Auth
-  login: async (email: string, password: string): Promise<{ user: User; token: string } | null> => {
+  login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
     await delay(500);
-    const user = await getUserByEmail(email);
-    if (!user || user.password !== password) return null;
-    
-    // Remove password from user object
-    const { password: _, ...userWithoutPassword } = user;
-    return {
-      user: userWithoutPassword as User,
-      token: 'mock-jwt-token',
-    };
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ email, password }),
+    });
+    return handleResponse(response);
   },
   
   // User functions
-  updateUser: async (id: string, data: Partial<User>) => {
-    return prisma.user.update({
-      where: { id },
-      data
+  createUser: async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    telegramId?: string;
+    role: 'USER' | 'ADMIN';
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(userData),
     });
+    return handleResponse(response);
+  },
+
+  getUserByEmail: async (email: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/email/${email}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  updateUser: async (id: string, data: Partial<User>) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
   },
   
   // Product functions
   createProduct: async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
-    return prisma.product.create({
-      data: product
+    const response = await fetch(`${API_BASE_URL}/products`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(product),
     });
+    return handleResponse(response);
   },
   
   getProducts: async () => {
-    return prisma.product.findMany({
-      include: {
-        category: true,
-        subcategory: true
-      }
+    const response = await fetch(`${API_BASE_URL}/products`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   getProductById: async (id: string) => {
-    return prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        subcategory: true
-      }
+    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   updateProduct: async (id: string, data: Partial<Product>) => {
-    return prisma.product.update({
-      where: { id },
-      data
+    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
     });
+    return handleResponse(response);
   },
   
   deleteProduct: async (id: string) => {
-    return prisma.product.delete({
-      where: { id }
+    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   // Category functions
   createCategory: async (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
-    return prisma.category.create({
-      data: category
+    const response = await fetch(`${API_BASE_URL}/categories`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(category),
     });
+    return handleResponse(response);
   },
   
   getCategories: async () => {
-    return prisma.category.findMany({
-      include: {
-        subcategories: true
-      }
+    const response = await fetch(`${API_BASE_URL}/categories`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
-  getCategoryById: async (id: string): Promise<Category | undefined> => {
-    await delay(200);
-    return prisma.category.findUnique({
-      where: { id },
-      include: {
-        subcategories: true
-      }
+  getCategoryById: async (id: string) => {
+    const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   updateCategory: async (id: string, data: Partial<Category>) => {
-    return prisma.category.update({
-      where: { id },
-      data
+    const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
     });
+    return handleResponse(response);
   },
   
   deleteCategory: async (id: string) => {
-    return prisma.category.delete({
-      where: { id }
+    const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   // Subcategory functions
   createSubcategory: async (subcategory: Omit<Subcategory, 'id' | 'createdAt' | 'updatedAt'>) => {
-    return prisma.subcategory.create({
-      data: subcategory
+    const response = await fetch(`${API_BASE_URL}/subcategories`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(subcategory),
     });
+    return handleResponse(response);
   },
   
   getSubcategories: async () => {
-    return prisma.subcategory.findMany({
-      include: {
-        category: true
-      }
+    const response = await fetch(`${API_BASE_URL}/subcategories`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
-  getSubcategoriesByCategoryId: async (categoryId: string): Promise<Subcategory[]> => {
-    await delay(300);
-    return prisma.subcategory.findMany({
-      where: { categoryId },
-      include: {
-        category: true
-      }
+  getSubcategoriesByCategoryId: async (categoryId: string) => {
+    const response = await fetch(`${API_BASE_URL}/subcategories?categoryId=${categoryId}`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
-  getSubcategoryById: async (id: string): Promise<Subcategory | undefined> => {
-    await delay(200);
-    return prisma.subcategory.findUnique({
-      where: { id },
-      include: {
-        category: true
-      }
+  getSubcategoryById: async (id: string) => {
+    const response = await fetch(`${API_BASE_URL}/subcategories/${id}`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   updateSubcategory: async (id: string, data: Partial<Subcategory>) => {
-    return prisma.subcategory.update({
-      where: { id },
-      data
+    const response = await fetch(`${API_BASE_URL}/subcategories/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
     });
+    return handleResponse(response);
   },
   
   deleteSubcategory: async (id: string) => {
-    return prisma.subcategory.delete({
-      where: { id }
+    const response = await fetch(`${API_BASE_URL}/subcategories/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   // Order functions
   createOrder: async (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>, items: Omit<OrderItem, 'id'>[]) => {
-    return prisma.order.create({
-      data: {
-        ...order,
-        items: {
-          create: items
-        }
-      },
-      include: {
-        items: {
-          include: {
-            product: true
-          }
-        },
-        user: true
-      }
+    const response = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ order, items }),
     });
+    return handleResponse(response);
   },
   
   getOrders: async (userId?: string) => {
-    return prisma.order.findMany({
-      where: userId ? { userId } : undefined,
-      include: {
-        items: {
-          include: {
-            product: true
-          }
-        },
-        user: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
+    const url = userId ? `${API_BASE_URL}/orders?userId=${userId}` : `${API_BASE_URL}/orders`;
+    const response = await fetch(url, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   getOrderById: async (id: string) => {
-    return prisma.order.findUnique({
-      where: { id },
-      include: {
-        items: {
-          include: {
-            product: true
-          }
-        },
-        user: true
-      }
+    const response = await fetch(`${API_BASE_URL}/orders/${id}`, {
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
   
   updateOrder: async (id: string, data: Partial<Order>) => {
-    return prisma.order.update({
-      where: { id },
-      data
+    const response = await fetch(`${API_BASE_URL}/orders/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
     });
+    return handleResponse(response);
   },
   
   deleteOrder: async (id: string) => {
-    return prisma.order.delete({
-      where: { id }
+    const response = await fetch(`${API_BASE_URL}/orders/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
     });
+    return handleResponse(response);
   },
-  
-  // Discounts
-  addProductDiscount: async (productId: string, discount: Omit<Discount, 'id' | 'productId'>): Promise<Product> => {
-    await delay(500);
-    
-    const productIndex = products.findIndex(product => product.id === productId);
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-    
-    const newDiscount = {
-      id: `discount-${Date.now()}`,
-      productId,
-      ...discount,
-    };
-    
-    const product = products[productIndex];
-    const updatedProduct = {
-      ...product,
-      discounts: [...(product.discounts || []), newDiscount],
-    };
-    
-    products[productIndex] = updatedProduct;
-    
-    return updatedProduct;
+
+  sendWelcomeEmail: async (email: string, data: {
+    name: string;
+    email: string;
+    password: string;
+  }) => {
+    const response = await fetch(`${API_BASE_URL}/users/welcome-email`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ email, data }),
+    });
+    return handleResponse(response);
   },
-  
-  removeProductDiscount: async (productId: string, discountId: string): Promise<Product> => {
-    await delay(400);
-    
-    const productIndex = products.findIndex(product => product.id === productId);
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-    
-    const product = products[productIndex];
-    if (!product.discounts) {
-      throw new Error('Product has no discounts');
-    }
-    
-    const updatedProduct = {
-      ...product,
-      discounts: product.discounts.filter(discount => discount.id !== discountId),
-    };
-    
-    products[productIndex] = updatedProduct;
-    
-    return updatedProduct;
-  },
-  
-  // Telegram notifications
-  sendTelegramNotification: async (userId: string, message: string): Promise<boolean> => {
-    await delay(300);
-    
-    const user = await getUserByEmail(userId);
-    if (!user || !user.telegramId) {
-      return false;
-    }
-    
-    // In a real app, we would send a message to the Telegram bot API
-    console.log(`Sending Telegram notification to ${user.telegramId}: ${message}`);
-    
-    return true;
+
+  sendTelegramNotification: async (userId: string, message: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/telegram-notification`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ message }),
+    });
+    return handleResponse(response);
   },
 };

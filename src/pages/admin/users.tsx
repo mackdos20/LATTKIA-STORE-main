@@ -9,7 +9,7 @@ import { useThemeStore } from "@/lib/theme";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import { User } from "@/lib/stores/auth-store";
+import { User } from "@/lib/db/models";
 import { Loader2, Plus, UserPlus, Eye, EyeOff, Pencil, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,7 +37,7 @@ const AdminUsers = () => {
     name: string;
     email: string;
     phone: string;
-    role: 'user' | 'admin';
+    role: 'USER' | 'ADMIN';
     telegramId?: string;
     password?: string;
   } | null>(null);
@@ -52,16 +52,22 @@ const AdminUsers = () => {
             id: "customer1",
             name: "Store Owner",
             email: "customer@example.com",
+            password: "hashed_password",
             phone: "+9876543210",
-            role: "customer",
+            role: "USER",
             telegramId: "@storeowner",
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
           {
             id: "customer2",
             name: "Another Store",
             email: "another@example.com",
+            password: "hashed_password",
             phone: "+1234567890",
-            role: "customer",
+            role: "USER",
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
         ]);
       } catch (error) {
@@ -92,27 +98,35 @@ const AdminUsers = () => {
     }
   };
 
-  const validateForm = (userData: typeof newUser) => {
+  const validateForm = (userData: typeof newUser, isEditing = false) => {
     const newErrors: Record<string, string> = {};
     
-    if (!userData.name) {
+    if (!userData.name.trim()) {
       newErrors.name = "الاسم مطلوب";
     }
     
-    if (!userData.email) {
+    if (!userData.email.trim()) {
       newErrors.email = "البريد الإلكتروني مطلوب";
-    } else if (!/\S+@\S+\.\S+/.test(userData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) {
       newErrors.email = "البريد الإلكتروني غير صالح";
     }
     
-    if (!userData.phone) {
+    if (!userData.phone.trim()) {
       newErrors.phone = "رقم الهاتف مطلوب";
+    } else if (!/^[+]?[\d\s-]{8,}$/.test(userData.phone)) {
+      newErrors.phone = "رقم الهاتف غير صالح";
     }
 
-    if (!editingUser && !userData.password) {
+    if (!isEditing && !userData.password) {
       newErrors.password = "كلمة المرور مطلوبة";
-    } else if (!editingUser && userData.password.length < 6) {
-      newErrors.password = "كلمة المرور يجب أن تكون 6 أحرف على الأقل";
+    } else if (!isEditing && userData.password.length < 8) {
+      newErrors.password = "كلمة المرور يجب أن تكون 8 أحرف على الأقل";
+    } else if (!isEditing && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(userData.password)) {
+      newErrors.password = "كلمة المرور يجب أن تحتوي على حروف كبيرة وصغيرة وأرقام";
+    }
+    
+    if (userData.telegramId && !/^@?[\w\d_]{5,}$/.test(userData.telegramId)) {
+      newErrors.telegramId = "معرف تيليجرام غير صالح";
     }
     
     setErrors(newErrors);
@@ -129,7 +143,7 @@ const AdminUsers = () => {
     try {
       const newUserData = await api.createUser({
         ...newUser,
-        role: "customer",
+        role: "USER",
       });
       
       setUsers((prev) => [...prev, newUserData]);
@@ -139,7 +153,6 @@ const AdminUsers = () => {
         description: `تم إنشاء حساب للمستخدم ${newUserData.name}`,
       });
       
-      // Reset form
       setNewUser({
         name: "",
         email: "",
@@ -147,10 +160,10 @@ const AdminUsers = () => {
         telegramId: "",
         password: "",
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "خطأ",
-        description: error.message || "حدث خطأ أثناء إنشاء المستخدم",
+        description: error instanceof Error ? error.message : "حدث خطأ أثناء إنشاء المستخدم",
         variant: "destructive",
       });
     } finally {
@@ -163,26 +176,42 @@ const AdminUsers = () => {
     
     if (!editUser) return;
     
+    if (editUser.role !== users.find(u => u.id === editUser.id)?.role) {
+      if (!window.confirm(`هل أنت متأكد من تغيير دور المستخدم إلى ${editUser.role === 'ADMIN' ? 'مدير' : 'مستخدم'}؟`)) {
+        return;
+      }
+    }
+    
+    if (editUser.password) {
+      if (!window.confirm('هل أنت متأكد من تغيير كلمة المرور؟')) {
+        return;
+      }
+    }
+    
+    if (!validateForm(editUser as any, true)) return;
+    
     try {
       const updatedUser = await api.updateUser(editUser.id, {
         name: editUser.name,
         email: editUser.email,
         phone: editUser.phone,
+        role: editUser.role,
         telegramId: editUser.telegramId || '',
-        password: editUser.password || '',
+        ...(editUser.password ? { password: editUser.password } : {}),
       });
       
       setUsers(users.map(user => user.id === updatedUser.id ? updatedUser : user));
+      
       toast({
         title: "تم تحديث المستخدم بنجاح",
         description: "تم تحديث بيانات المستخدم بنجاح",
       });
       
       setEditUser(null);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "خطأ",
-        description: error.message || "حدث خطأ أثناء تحديث المستخدم",
+        description: error instanceof Error ? error.message : "حدث خطأ أثناء تحديث المستخدم",
         variant: "destructive",
       });
     }
@@ -194,13 +223,13 @@ const AdminUsers = () => {
       name: user.name,
       email: user.email,
       phone: user.phone,
-      role: user.role as 'user' | 'admin',
+      role: user.role,
       telegramId: user.telegramId,
     });
   };
 
   // Redirect if not admin
-  if (user?.role !== 'admin') {
+  if (user?.role !== 'ADMIN') {
     return <Navigate to="/" />;
   }
 
@@ -469,15 +498,15 @@ const AdminUsers = () => {
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-right block">الدور</Label>
                 <Select
-                  value={editUser?.role || 'user'}
-                  onValueChange={(value) => setEditUser(prev => prev ? { ...prev, role: value as 'user' | 'admin' } : null)}
+                  value={editUser?.role || 'USER'}
+                  onValueChange={(value) => setEditUser(prev => prev ? { ...prev, role: value as 'USER' | 'ADMIN' } : null)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الدور" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">مستخدم</SelectItem>
-                    <SelectItem value="admin">مدير</SelectItem>
+                    <SelectItem value="USER">مستخدم</SelectItem>
+                    <SelectItem value="ADMIN">مدير</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -51,15 +51,15 @@ const OrdersPage = () => {
 
   const getStatusIcon = (status: Order['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return <Clock className="h-5 w-5 text-yellow-500" />;
-      case 'approved':
+      case 'PROCESSING':
         return <ShoppingBag className="h-5 w-5 text-green-500" />;
-      case 'shipping':
+      case 'SHIPPED':
         return <Truck className="h-5 w-5 text-blue-500" />;
-      case 'delivered':
+      case 'DELIVERED':
         return <Package className="h-5 w-5 text-green-500" />;
-      case 'cancelled':
+      case 'CANCELLED':
         return <Package className="h-5 w-5 text-red-500" />;
       default:
         return <Clock className="h-5 w-5 text-yellow-500" />;
@@ -68,15 +68,15 @@ const OrdersPage = () => {
 
   const getStatusText = (status: Order['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return 'بانتظار المراجعة';
-      case 'approved':
-        return 'تمت الموافقة';
-      case 'shipping':
+      case 'PROCESSING':
+        return 'قيد المعالجة';
+      case 'SHIPPED':
         return 'قيد التوصيل';
-      case 'delivered':
+      case 'DELIVERED':
         return 'تم التسليم';
-      case 'cancelled':
+      case 'CANCELLED':
         return 'تم الإلغاء';
       default:
         return 'بانتظار المراجعة';
@@ -85,15 +85,15 @@ const OrdersPage = () => {
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return theme === 'dark' ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700';
-      case 'approved':
+      case 'PROCESSING':
         return theme === 'dark' ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700';
-      case 'shipping':
+      case 'SHIPPED':
         return theme === 'dark' ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700';
-      case 'delivered':
+      case 'DELIVERED':
         return theme === 'dark' ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700';
-      case 'cancelled':
+      case 'CANCELLED':
         return theme === 'dark' ? 'bg-red-900/30 text-red-300' : 'bg-red-100 text-red-700';
       default:
         return theme === 'dark' ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700';

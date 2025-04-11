@@ -113,16 +113,87 @@ const AdminProducts = () => {
     setNewDiscount(prev => ({ ...prev, [field]: e.target.value }));
   };
   
+  const handleImageUpload = async (imageUrl: string) => {
+    if (!imageUrl) {
+      toast({
+        title: "خطأ",
+        description: "فشل في رفع الصورة",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImagePreview(imageUrl);
+    setImageFile(null);
+  };
+  
+  const handleImageDelete = () => {
+    setImagePreview(null);
+    setImageFile(null);
+  };
+  
+  const validateDiscounts = (discounts: { minQuantity: number; discountPercentage: number }[]) => {
+    // التحقق من تداخل الكميات
+    const quantities = discounts.map(d => d.minQuantity).sort((a, b) => a - b);
+    for (let i = 0; i < quantities.length - 1; i++) {
+      if (quantities[i] === quantities[i + 1]) {
+        return "لا يمكن تكرار نفس الكمية للخصومات";
+      }
+    }
+
+    // التحقق من النسب المئوية
+    for (const discount of discounts) {
+      if (discount.discountPercentage <= 0 || discount.discountPercentage > 100) {
+        return "يجب أن تكون نسبة الخصم بين 1 و 100";
+      }
+    }
+
+    return null;
+  };
+  
   const addDiscount = () => {
-    if (!newDiscount.minQuantity || !newDiscount.discountPercentage) return;
-    
+    if (!newDiscount.minQuantity || !newDiscount.discountPercentage) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع حقول الخصم",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const minQuantity = parseInt(newDiscount.minQuantity);
     const discountPercentage = parseFloat(newDiscount.discountPercentage);
-    
-    if (isNaN(minQuantity) || isNaN(discountPercentage)) return;
-    if (minQuantity <= 0 || discountPercentage <= 0 || discountPercentage > 100) return;
-    
-    setDiscounts(prev => [...prev, { minQuantity, discountPercentage }]);
+
+    if (isNaN(minQuantity) || isNaN(discountPercentage)) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال أرقام صحيحة",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (minQuantity <= 0) {
+      toast({
+        title: "خطأ",
+        description: "يجب أن تكون الكمية أكبر من 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newDiscounts = [...discounts, { minQuantity, discountPercentage }];
+    const error = validateDiscounts(newDiscounts);
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDiscounts(newDiscounts);
     setNewDiscount({ minQuantity: "", discountPercentage: "" });
   };
   
@@ -130,14 +201,22 @@ const AdminProducts = () => {
     setDiscounts(prev => prev.filter((_, i) => i !== index));
   };
   
-  const handleImageUpload = async (imageUrl: string) => {
-    setImagePreview(imageUrl);
-    setImageFile(null); // We don't need the file anymore as it's uploaded to Cloudinary
-  };
-  
-  const handleImageDelete = () => {
-    setImagePreview(null);
-    setImageFile(null);
+  const handleCategoryChange = (categoryId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      categoryId,
+      subcategoryId: "", // إعادة تعيين القسم الفرعي عند تغيير الفئة
+    }));
+
+    const filtered = subcategories.filter(sub => sub.categoryId === categoryId);
+    setFilteredSubcategories(filtered);
+
+    if (filtered.length === 0) {
+      toast({
+        title: "تنبيه",
+        description: "لا توجد أقسام فرعية لهذه الفئة",
+      });
+    }
   };
   
   const openNewProductDialog = () => {
@@ -192,7 +271,7 @@ const AdminProducts = () => {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.price || !formData.stock || !formData.subcategoryId) {
       toast({
         title: "خطأ",
@@ -201,18 +280,36 @@ const AdminProducts = () => {
       });
       return;
     }
-    
+
+    if (!imagePreview) {
+      toast({
+        title: "خطأ",
+        description: "يرجى رفع صورة للمنتج",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const error = validateDiscounts(discounts);
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
-    
+
     try {
-      // Create discount objects with proper structure
       const formattedDiscounts: Discount[] = discounts.map((discount, index) => ({
         id: `temp-${index}`,
         productId: selectedProduct?.id || 'new',
         minQuantity: discount.minQuantity,
         discountPercentage: discount.discountPercentage
       }));
-      
+
       const productData = {
         name: formData.name,
         description: formData.description,
@@ -220,39 +317,31 @@ const AdminProducts = () => {
         cost: parseFloat(formData.cost),
         stock: parseInt(formData.stock),
         subcategoryId: formData.subcategoryId,
-        image: imagePreview || "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?q=80&w=500&auto=format&fit=crop",
+        image: imagePreview,
         discounts: formattedDiscounts,
       };
-      
+
       if (selectedProduct) {
-        // Update existing product
-        const updatedProduct = await api.updateProduct(selectedProduct.id, productData, imageFile || undefined);
-        
-        setProducts(prev => 
-          prev.map(p => p.id === updatedProduct.id ? updatedProduct : p)
-        );
-        
+        const updatedProduct = await api.updateProduct(selectedProduct.id, productData);
+        setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
         toast({
           title: "تم التحديث",
           description: `تم تحديث المنتج ${updatedProduct.name} بنجاح`,
         });
       } else {
-        // Create new product
-        const newProduct = await api.createProduct(productData as any, imageFile || undefined);
-        
+        const newProduct = await api.createProduct(productData as any);
         setProducts(prev => [...prev, newProduct]);
-        
         toast({
           title: "تم الإنشاء",
           description: `تم إنشاء المنتج ${newProduct.name} بنجاح`,
         });
       }
-      
+
       setIsDialogOpen(false);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "خطأ",
-        description: error.message || "حدث خطأ أثناء حفظ المنتج",
+        description: error instanceof Error ? error.message : "حدث خطأ أثناء حفظ المنتج",
         variant: "destructive",
       });
     } finally {
@@ -296,7 +385,7 @@ const AdminProducts = () => {
   });
   
   // Redirect if not admin
-  if (user?.role !== 'admin') {
+  if (user?.role !== 'ADMIN') {
     return <Navigate to="/" />;
   }
 

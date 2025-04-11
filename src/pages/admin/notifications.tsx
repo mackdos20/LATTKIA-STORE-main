@@ -144,7 +144,7 @@ const AdminNotifications = () => {
   };
   
   // Redirect if not admin
-  if (user?.role !== 'admin') {
+  if (user?.role !== 'ADMIN') {
     return <Navigate to="/" />;
   }
 

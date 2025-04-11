@@ -60,12 +60,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
 
-    // Here you would typically fetch the user data from the API
-    // For now, we'll just set the user ID and role
     set({
       user: {
         id: decoded.userId,
-        role: decoded.role,
+        role: decoded.role === 'ADMIN' ? 'ADMIN' : 'USER',
         name: '',
         email: '',
         password: '',
